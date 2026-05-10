@@ -181,7 +181,7 @@ elif page == "3. Capacity Tracker":
     st.title("⏱️ Factory Capacity vs Demand")
     st.info("""
     **💡 Manager's Guide:** This is your workforce scheduling tool. It calculates if you have enough human-hours to complete the planned work. 
-      ⚠️ **Watch the Deficit column:** Any number highlighted in **Red** means the factory is understaffed for that week. You must authorize overtime or hire contractors to prevent project delays.
+    **Watch the Deficit column:** Any number highlighted in **Red** means the factory is understaffed for that week. You must authorize overtime or hire contractors to prevent project delays.
     """)
     
     query = """
