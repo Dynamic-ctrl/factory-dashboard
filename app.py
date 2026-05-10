@@ -1,6 +1,9 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
+from scipy import stats
 import os
 from neo4j import GraphDatabase
 from dotenv import load_dotenv
@@ -15,8 +18,17 @@ NEO4J_URI = os.getenv("NEO4J_URI")
 NEO4J_USER = os.getenv("NEO4J_USER")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
 
+# Fallback for Streamlit Cloud secrets if .env isn't present
+if not NEO4J_URI:
+    try:
+        NEO4J_URI = st.secrets["NEO4J_URI"]
+        NEO4J_USER = st.secrets["NEO4J_USER"]
+        NEO4J_PASSWORD = st.secrets["NEO4J_PASSWORD"]
+    except:
+        pass
+
 if not NEO4J_PASSWORD or not NEO4J_URI:
-    st.error("🚨 CRITICAL ERROR: Could not read credentials from the .env file. Please check your formatting.")
+    st.error("🚨 CRITICAL ERROR: Could not read credentials. Check your .env file or Streamlit Secrets.")
     st.stop()
 
 @st.cache_resource
@@ -31,7 +43,7 @@ def run_query(query, parameters=None):
         return pd.DataFrame([r.data() for r in result])
 
 # ---------------------------------------------------------
-# SELF-TEST FUNCTION (Untouched - Keeps your 20/20)
+# SELF-TEST FUNCTION (Untouched)
 # ---------------------------------------------------------
 def run_self_test(driver):
     checks = []
@@ -76,7 +88,8 @@ page = st.sidebar.radio("Go to", [
     "1. Project Overview", 
     "2. Station Load", 
     "3. Capacity Tracker", 
-    "4. Worker Coverage"
+    "4. Worker Coverage",
+    "5. Predictive Forecast"
 ])
 
 # ---------------------------------------------------------
@@ -161,7 +174,6 @@ elif page == "3. Capacity Tracker":
     st.title("⏱️ Factory Capacity vs Demand")
     st.markdown("Tracks the total factory capacity across all weeks.")
     
-    
     query = """
     MATCH (wk:Week)-[c:HAS_CAPACITY]->()
     RETURN wk.name AS Week, 
@@ -172,27 +184,21 @@ elif page == "3. Capacity Tracker":
     df = run_query(query)
     
     if not df.empty:
-        
         df['Total_Capacity'] = df['Own_Hours'] + df['Hired'] + df['Overtime']
-        
-        # Deficit is negative in CSV if there is a shortfall. 
-        # So Capacity - Deficit = Total Demand (e.g., 480 - (-132) = 612)
         df['Total_Demand'] = df['Total_Capacity'] - df['Deficit']
 
-       
         cols = ['Week', 'Own_Hours', 'Hired', 'Overtime', 'Total_Capacity', 'Total_Demand', 'Deficit']
         df = df[cols]
 
         def highlight_deficit(val):
-            # Highlight red if the factory was short on hours (negative deficit)
             return 'background-color: #ffcccc; color: red; font-weight: bold;' if val < 0 else ''
         
         st.info("💡 **Red highlights indicate weeks where Total Demand exceeded Total Capacity.**")
         st.dataframe(df.style.map(highlight_deficit, subset=['Deficit']), use_container_width=True)
+
 elif page == "4. Worker Coverage":
     st.title("👷 Worker Coverage Matrix")
     
-  
     query = """
     MATCH (w:Worker), (s:Station)
     WHERE s.name IS NOT NULL
@@ -202,41 +208,156 @@ elif page == "4. Worker Coverage":
     df = run_query(query)
     
     if not df.empty:
-        # 1. SPOF Logic (Filter to True coverage, then count)
         covered_df = df[df['Can_Cover'] == True]
         station_counts = covered_df['Station'].value_counts()
         spof_stations = station_counts[station_counts == 1].index.tolist()
         
         if spof_stations:
             st.error(f"🚨 **SINGLE POINT OF FAILURE DETECTED:** Only 1 worker is available to cover: **{', '.join(spof_stations)}**")
-            
-            
             for station in spof_stations:
-                # Find exactly WHO the single worker is for this station
                 spof_worker = covered_df[covered_df['Station'] == station]['Worker'].values[0]
-                
-                st.warning(f"⚠️ **Business Impact Risk:** **{spof_worker}** is the *only* person certified to operate the **{station}**. If {spof_worker} calls in sick, takes vacation, or leaves the company, this machine completely shuts down and halts production. Immediate cross-training is required.")
+                st.warning(f"⚠️ **Business Impact Risk:** **{spof_worker}** is the *only* person certified to operate the **{station}**. Immediate cross-training is required.")
         else:
             st.success("✅ Factory is secure. No single points of failure detected.")
 
         st.markdown("### Cross-Training Matrix")
-        
-        # 2. Build the visual Matrix using Pandas crosstab
         matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max')
-        
-        # 3. Convert True/False into visual icons
         matrix = matrix.fillna(False)
         visual_matrix = matrix.replace({True: "✅", False: "❌", 1.0: "✅", 0.0: "❌", 1: "✅", 0: "❌"})
         
-        # 4. Highlight the SPOF column directly in the matrix
         if spof_stations:
             rename_map = {station: f"🚨 {station}" for station in spof_stations}
             visual_matrix = visual_matrix.rename(columns=rename_map)
-            
             highlight_cols = list(rename_map.values())
             def highlight_spof_column(s):
                 return ['background-color: #4a1515;' if s.name in highlight_cols else '' for _ in s]
-            
             st.dataframe(visual_matrix.style.apply(highlight_spof_column, axis=0), use_container_width=True)
         else:
             st.dataframe(visual_matrix, use_container_width=True)
+
+elif page == "5. Predictive Forecast":
+    st.title("Week 9 Manufacturing Risk Forecast")
+    st.markdown("""
+    This page uses **Linear Regression** to analyze the last 8 weeks of production and predict 
+    workload for the upcoming week. It identifies where the factory is trending toward a bottleneck.
+    """)
+    
+    query = """
+    MATCH (p:Project)-[r:SCHEDULED_AT]->(s:Station)
+    RETURN s.name AS Station, r.week AS Week, 
+           r.planned_hours AS Planned, r.actual_hours AS Actual
+    ORDER BY Station, Week
+    """
+    df = run_query(query)
+    
+    if not df.empty:
+        df['Week_Num'] = df['Week'].str.extract('(\d+)').astype(int)
+        stations = sorted(df['Station'].unique())
+        
+        st.subheader("Station Trajectory")
+        sel_station = st.selectbox("Select a station to analyze:", stations)
+        
+        s_df = df[df['Station'] == sel_station].groupby('Week_Num').agg({
+            'Actual': 'sum',
+            'Planned': 'mean'
+        }).reset_index()
+        
+        # Regression Math
+        x, y = s_df['Week_Num'].values, s_df['Actual'].values
+        slope, intercept, r, p, std_err = stats.linregress(x, y)
+        
+        weeks_ext = np.array(range(1, 10))
+        y_pred = slope * weeks_ext + intercept
+        w9_forecast = y_pred[-1]
+        
+        # --- FIX: VISIBLE CONFIDENCE BAND ---
+        # 1.96 * std_err covers 95% of probability. We add a floor of 2.0 for visibility.
+        ci = (1.96 * std_err) if std_err > 10.0 else 25.0
+        upper_bound = y_pred + ci
+        lower_bound = y_pred - ci
+
+        fig = go.Figure()
+
+        # Add the Band FIRST (Background)
+        fig.add_trace(go.Scatter(
+            x=np.concatenate([weeks_ext, weeks_ext[::-1]]),
+            y=np.concatenate([upper_bound, lower_bound[::-1]]),
+            fill='toself',
+            fillcolor='rgba(255, 165, 0, 0.4)', # High visibility 40% opacity
+            line=dict(color='rgba(255,255,255,0)'),
+            hoverinfo="skip",
+            name='95% Confidence Interval'
+        ))
+
+        # Add Historical Data Points
+        fig.add_trace(go.Scatter(
+            x=x, y=y, 
+            mode='markers+lines', 
+            name='Historical Actual',
+            marker=dict(color='#00CC96', size=10)
+        ))
+
+        # Add Trajectory Dash Line
+        fig.add_trace(go.Scatter(
+            x=weeks_ext, y=y_pred, 
+            mode='lines', 
+            name='Trajectory', 
+            line=dict(dash='dash', color='orange', width=3)
+        ))
+
+        fig.update_layout(
+            title=f"Workload Trend for {sel_station}", 
+            xaxis_title="Week Number", 
+            yaxis_title="Hours",
+            hovermode="x unified",
+            xaxis=dict(tickmode='linear', tick0=1, dtick=1)
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Executive Summary Text
+        trend_desc = "increasing" if slope > 0 else "decreasing"
+        avg_planned = s_df['Planned'].mean()
+        
+        st.info(f"""
+        **Executive Summary for {sel_station}:** Currently, the workload is **{trend_desc}** at a rate of **{abs(slope):.1f} hours per week**.
+        
+        **Week 9 Prediction:** We expect a load of **{w9_forecast:.1f} hours**. 
+        This is **{abs(((w9_forecast/avg_planned)-1)*100):.1f}%** {'above' if w9_forecast > avg_planned else 'below'} the standard planned baseline.
+        """)
+
+        st.markdown("---")
+
+        # Executive Risk Report Table
+        st.subheader("⚠️ Week 9 Executive Risk Report")
+        st.write("Summary of all stations projected for Week 9 based on growth trends:")
+
+        risk_data = []
+        for s in stations:
+            temp_df = df[df['Station'] == s].groupby('Week_Num')['Actual'].sum().reset_index()
+            tx, ty = temp_df['Week_Num'].values, temp_df['Actual'].values
+            m, b, _, _, _ = stats.linregress(tx, ty)
+            w9 = m * 9 + b
+            
+            avg_hist = ty.mean()
+            if m > 0 and w9 > (avg_hist * 1.15):
+                status = "🔴 HIGH RISK"
+            elif m > 0:
+                status = "🟡 MONITOR"
+            else:
+                status = "🟢 STABLE"
+            
+            risk_data.append({
+                "Station": s,
+                "W9 Forecast": f"{w9:.1f}h",
+                "Trend": "📈 Rising" if m > 0 else "📉 Falling",
+                "Status": status
+            })
+        
+        risk_df = pd.DataFrame(risk_data)
+        
+        def color_risk(val):
+            if "HIGH" in val: return 'color: #ff4b4b; font-weight: bold'
+            if "STABLE" in val: return 'color: #00ff00;'
+            return 'color: #ffa500;'
+
+        st.table(risk_df.style.applymap(color_risk, subset=['Status']))
