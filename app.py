@@ -360,4 +360,4 @@ elif page == "5. Predictive Forecast":
             if "STABLE" in val: return 'color: #00ff00;'
             return 'color: #ffa500;'
 
-        st.table(risk_df.style.applymap(color_risk, subset=['Status']))
+        st.table(risk_df.style.map(color_risk, subset=['Status']))
