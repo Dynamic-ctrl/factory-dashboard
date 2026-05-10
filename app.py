@@ -9,34 +9,13 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------
-# SETUP & CUSTOM PROFESSIONAL UI
+# SETUP & UI ADJUSTMENTS
 # ---------------------------------------------------------
 st.set_page_config(page_title="Factory Intelligence Dashboard", layout="wide")
 
-# Custom CSS for Professional Industrial Look
+# Custom CSS: Default background restored, specific element styling preserved
 st.markdown("""
     <style>
-    /* Hide Streamlit Clutter */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
-    /* Main Background & Typography */
-    [data-testid="stAppViewContainer"] {
-        background-color: #0E1117;
-    }
-    
-    html, body, [class*="css"] {
-        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-        color: #C9D1D9;
-    }
-
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background-color: #161B22;
-        border-right: 1px solid #30363D;
-    }
-    
     /* Metric Card Styling */
     [data-testid="stMetricValue"] {
         font-size: 2.2rem !important;
@@ -46,22 +25,17 @@ st.markdown("""
     
     [data-testid="stMetricLabel"] {
         font-size: 0.9rem !important;
-        color: #8B949E !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
 
     /* Table & Dataframe Styling */
     .stDataFrame, .stTable {
-        border: 1px solid #30363D;
         border-radius: 4px;
     }
 
     /* Info/Warning Box Styling */
     .stAlert {
-        background-color: #161B22;
-        border: 1px solid #30363D;
-        color: #C9D1D9;
         border-radius: 4px;
     }
     </style>
@@ -99,7 +73,7 @@ def run_query(query, parameters=None):
 # ---------------------------------------------------------
 # NAVIGATION
 # ---------------------------------------------------------
-st.sidebar.title("Navigation")
+st.sidebar.title("Level 6 Aditi Mehta")
 page = st.sidebar.radio("Go to", [
     "Self-Test", 
     "1. Project Overview", 
@@ -112,7 +86,6 @@ page = st.sidebar.radio("Go to", [
 # Professional Chart Theming Function
 def apply_chart_theme(fig):
     fig.update_layout(
-        template="plotly_dark",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         colorway=["#58A6FF", "#3FB950", "#D29922", "#F85149", "#BC8CFF"],
@@ -129,7 +102,6 @@ if page == "Self-Test":
     st.title("Level 6 Self-Test")
     st.markdown("Automated grading checks to verify Graph architecture.")
     
-    # Self-test code kept exactly as provided
     def run_self_test_internal(driver):
         checks = []
         try:
@@ -162,13 +134,12 @@ if page == "Self-Test":
     with st.spinner("Running tests..."):
         results = run_self_test_internal(driver)
     
-    total_score = 0
+    total_score = sum([score for _, passed, score in results if passed])
     max_score = sum([score for _, _, score in results])
     
     for text, passed, score in results:
         if passed:
             st.success(f"PASSED: {text} ({score}/{score})")
-            total_score += score
         else:
             st.error(f"FAILED: {text} (0/{score})")
             
