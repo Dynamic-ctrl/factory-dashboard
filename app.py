@@ -118,6 +118,11 @@ if page == "✅ Self-Test":
 
 elif page == "1. Project Overview":
     st.title("📊 Project Overview")
+    st.info("""
+    **💡 Manager's Guide:** This page tracks the overall health of your active projects. Pay close attention to **Variance %**. 
+    * 🔴 **Positive Variance (e.g., +15%):** The project took *longer* than estimated, costing the company extra money. 
+    * 🟢 **Zero or Negative Variance:** The project is on-time or finishing faster than budgeted.
+    """)
     query = """
     MATCH (p:Project)
     OPTIONAL MATCH (p)-[r:SCHEDULED_AT]->(:Station)
@@ -143,7 +148,9 @@ elif page == "1. Project Overview":
 
 elif page == "2. Station Load":
     st.title("🏭 Station Load (Weekly Timeline)")
-    
+    st.info("""
+    **💡 Manager's Guide:** This timeline helps spot physical bottlenecks on the factory floor. Compare the **Planned** (estimated) vs **Actual** (realized) hours. If a station consistently logs higher actual hours, it indicates machine wear, underestimation by the planning team, or a need for operator training.
+    """)
     query = """
     MATCH (p:Project)-[r:SCHEDULED_AT]->(s:Station)
     RETURN s.name AS Station, r.week AS Week, 
@@ -172,7 +179,9 @@ elif page == "2. Station Load":
 
 elif page == "3. Capacity Tracker":
     st.title("⏱️ Factory Capacity vs Demand")
-    st.markdown("Tracks the total factory capacity across all weeks.")
+    st.info("""
+    **💡 Manager's Guide:** This timeline helps spot physical bottlenecks on the factory floor. Compare the **Planned** (estimated) vs **Actual** (realized) hours. If a station consistently logs higher actual hours, it indicates machine wear, underestimation by the planning team, or a need for operator training.
+    """)
     
     query = """
     MATCH (wk:Week)-[c:HAS_CAPACITY]->()
