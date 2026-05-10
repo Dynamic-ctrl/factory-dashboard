@@ -180,7 +180,8 @@ elif page == "2. Station Load":
 elif page == "3. Capacity Tracker":
     st.title("⏱️ Factory Capacity vs Demand")
     st.info("""
-    **💡 Manager's Guide:** This timeline helps spot physical bottlenecks on the factory floor. Compare the **Planned** (estimated) vs **Actual** (realized) hours. If a station consistently logs higher actual hours, it indicates machine wear, underestimation by the planning team, or a need for operator training.
+    **💡 Manager's Guide:** This is your workforce scheduling tool. It calculates if you have enough human-hours to complete the planned work. 
+    ⚠️ **Watch the Deficit column:** Any number highlighted in **Red** means the factory is understaffed for that week. You must authorize overtime or hire contractors to prevent project delays.
     """)
     
     query = """
