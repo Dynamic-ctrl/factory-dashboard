@@ -13,14 +13,9 @@ from dotenv import load_dotenv
 # ---------------------------------------------------------
 st.set_page_config(page_title="Factory Intelligence Dashboard", layout="wide")
 
-# Custom CSS for Professional Industrial Look
+# Custom CSS for Professional Industrial Look (Standard Streamlit Menu/Footer Restored)
 st.markdown("""
     <style>
-    /* Hide Streamlit Clutter */
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    
     /* Main Background & Typography */
     [data-testid="stAppViewContainer"] {
         background-color: #0E1117;
@@ -99,7 +94,7 @@ def run_query(query, parameters=None):
 # ---------------------------------------------------------
 # NAVIGATION
 # ---------------------------------------------------------
-st.sidebar.title("Navigation")
+st.sidebar.title("Level 6 Aditi Mehta")
 page = st.sidebar.radio("Go to", [
     "Self-Test", 
     "1. Project Overview", 
@@ -129,7 +124,6 @@ if page == "Self-Test":
     st.title("Level 6 Self-Test")
     st.markdown("Automated grading checks to verify Graph architecture.")
     
-    # Self-test code kept exactly as provided
     def run_self_test_internal(driver):
         checks = []
         try:
