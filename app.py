@@ -9,27 +9,35 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------
-# SETUP & UI ADJUSTMENTS
+# SETUP & CUSTOM PROFESSIONAL UI
 # ---------------------------------------------------------
 st.set_page_config(page_title="Factory Intelligence Dashboard", layout="wide")
 
-# Custom CSS for Sidebar Footer and Specific Components Only
+# Custom CSS for Professional Industrial Look
 st.markdown("""
     <style>
-    /* Fixed Footer in Sidebar */
-    [data-testid="stSidebarNav"] {
-        padding-bottom: 50px;
-    }
-    .sidebar-footer {
-        position: fixed;
-        bottom: 20px;
-        left: 20px;
-        font-size: 0.85rem;
-        color: #888;
-        z-index: 1000;
+    /* Hide Streamlit Clutter */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Main Background & Typography */
+    [data-testid="stAppViewContainer"] {
+        background-color: #0E1117;
     }
     
-    /* Specific Component Styling */
+    html, body, [class*="css"] {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        color: #C9D1D9;
+    }
+
+    /* Sidebar Styling */
+    [data-testid="stSidebar"] {
+        background-color: #161B22;
+        border-right: 1px solid #30363D;
+    }
+    
+    /* Metric Card Styling */
     [data-testid="stMetricValue"] {
         font-size: 2.2rem !important;
         font-weight: 600 !important;
@@ -38,15 +46,22 @@ st.markdown("""
     
     [data-testid="stMetricLabel"] {
         font-size: 0.9rem !important;
+        color: #8B949E !important;
         text-transform: uppercase;
         letter-spacing: 1px;
     }
 
+    /* Table & Dataframe Styling */
     .stDataFrame, .stTable {
+        border: 1px solid #30363D;
         border-radius: 4px;
     }
 
+    /* Info/Warning Box Styling */
     .stAlert {
+        background-color: #161B22;
+        border: 1px solid #30363D;
+        color: #C9D1D9;
         border-radius: 4px;
     }
     </style>
@@ -82,7 +97,7 @@ def run_query(query, parameters=None):
         return pd.DataFrame([r.data() for r in result])
 
 # ---------------------------------------------------------
-# NAVIGATION & SIDEBAR FOOTER
+# NAVIGATION
 # ---------------------------------------------------------
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", [
@@ -94,12 +109,10 @@ page = st.sidebar.radio("Go to", [
     "5. Predictive Forecast"
 ])
 
-# Sidebar Footer
-st.sidebar.markdown('<div class="sidebar-footer">Aditi Mehta</div>', unsafe_allow_html=True)
-
-# Chart Theming
+# Professional Chart Theming Function
 def apply_chart_theme(fig):
     fig.update_layout(
+        template="plotly_dark",
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         colorway=["#58A6FF", "#3FB950", "#D29922", "#F85149", "#BC8CFF"],
@@ -116,6 +129,7 @@ if page == "Self-Test":
     st.title("Level 6 Self-Test")
     st.markdown("Automated grading checks to verify Graph architecture.")
     
+    # Self-test code kept exactly as provided
     def run_self_test_internal(driver):
         checks = []
         try:
@@ -148,12 +162,13 @@ if page == "Self-Test":
     with st.spinner("Running tests..."):
         results = run_self_test_internal(driver)
     
-    total_score = sum([score for _, passed, score in results if passed])
+    total_score = 0
     max_score = sum([score for _, _, score in results])
     
     for text, passed, score in results:
         if passed:
             st.success(f"PASSED: {text} ({score}/{score})")
+            total_score += score
         else:
             st.error(f"FAILED: {text} (0/{score})")
             
@@ -177,9 +192,11 @@ elif page == "1. Project Overview":
            collect(DISTINCT pr.type) AS Products
     """
     df = run_query(query)
+    
     if not df.empty:
         df['Variance %'] = ((df['Actual_Hours'] - df['Planned_Hours']) / df['Planned_Hours'] * 100).round(2)
         df['Products'] = df['Products'].apply(lambda x: ", ".join(x))
+        
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Active Projects", len(df))
         col2.metric("Total Planned Hours", f"{df['Planned_Hours'].sum():,.0f}h")
@@ -199,15 +216,22 @@ elif page == "2. Station Load":
     ORDER BY Week
     """
     df = run_query(query)
+    
     if not df.empty:
         station_list = df['Station'].unique().tolist()
         selected_station = st.selectbox("Filter by Station:", ["All Stations"] + station_list)
         plot_df = df if selected_station == "All Stations" else df[df['Station'] == selected_station]
         df_melt = plot_df.melt(id_vars=["Station", "Week"], value_vars=["Planned", "Actual"], 
                           var_name="Type", value_name="Hours")
+        
         fig = px.bar(df_melt, x="Week", y="Hours", color="Type", barmode="group",
                      title=f"Planned vs Actual Hours: {selected_station}")
         st.plotly_chart(apply_chart_theme(fig), use_container_width=True)
+        
+        over_budget = df[df['Actual'] > df['Planned']]
+        if not over_budget.empty:
+            st.warning("Alert: Stations exceeding planned hours (Actual > Planned):")
+            st.dataframe(over_budget, use_container_width=True)
 
 elif page == "3. Capacity Tracker":
     st.title("Factory Capacity vs Demand")
@@ -226,8 +250,10 @@ elif page == "3. Capacity Tracker":
     if not df.empty:
         df['Total_Capacity'] = df['Own_Hours'] + df['Hired'] + df['Overtime']
         df['Total_Demand'] = df['Total_Capacity'] - df['Deficit']
+        cols = ['Week', 'Own_Hours', 'Hired', 'Overtime', 'Total_Capacity', 'Total_Demand', 'Deficit']
+        df = df[cols]
         def highlight_deficit(val):
-            return 'background-color: #ffcccc; color: #ff6b6b; font-weight: bold;' if val < 0 else ''
+            return 'background-color: #4a1515; color: #ff6b6b; font-weight: bold;' if val < 0 else ''
         st.dataframe(df.style.map(highlight_deficit, subset=['Deficit']), use_container_width=True)
 
 elif page == "4. Worker Coverage":
@@ -244,29 +270,62 @@ elif page == "4. Worker Coverage":
         station_counts = covered_df['Station'].value_counts()
         spof_stations = station_counts[station_counts == 1].index.tolist()
         if spof_stations:
-            st.error(f"SINGLE POINT OF FAILURE DETECTED: {', '.join(spof_stations)}")
-        matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max').fillna(False)
-        st.dataframe(matrix.replace({True: "OK", False: "--"}), use_container_width=True)
+            st.error(f"SINGLE POINT OF FAILURE DETECTED: Only 1 worker is available to cover: {', '.join(spof_stations)}")
+            for station in spof_stations:
+                spof_worker = covered_df[covered_df['Station'] == station]['Worker'].values[0]
+                st.warning(f"Business Impact Risk: {spof_worker} is the only person certified to operate the {station}. If worker is unavailable, this machine shuts down and halts production. Immediate cross-training is required.")
+        else:
+            st.success("Factory is secure. No single points of failure detected.")
+        st.markdown("### Cross-Training Matrix")
+        matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max')
+        matrix = matrix.fillna(False)
+        visual_matrix = matrix.replace({True: "OK", False: "--"})
+        st.dataframe(visual_matrix, use_container_width=True)
 
 elif page == "5. Predictive Forecast":
     st.title("Week 9 Manufacturing Risk Forecast")
     st.markdown("Analysis of production trends utilizing linear regression to identify upcoming bottlenecks.")
     query = """
     MATCH (p:Project)-[r:SCHEDULED_AT]->(s:Station)
-    RETURN s.name AS Station, r.week AS Week, r.actual_hours AS Actual
+    RETURN s.name AS Station, r.week AS Week, 
+           r.planned_hours AS Planned, r.actual_hours AS Actual
+    ORDER BY Station, Week
     """
     df = run_query(query)
     if not df.empty:
-        df['W_Num'] = df['Week'].str.extract('(\d+)').astype(int)
+        df['Week_Num'] = df['Week'].str.extract('(\d+)').astype(int)
         stations = sorted(df['Station'].unique())
-        sel_station = st.selectbox("Select station:", stations)
-        s_df = df[df['Station'] == sel_station].groupby('W_Num')['Actual'].sum().reset_index()
-        x, y = s_df['W_Num'].values, s_df['Actual'].values
-        m, b, _, _, _ = stats.linregress(x, y)
-        w9 = m * 9 + b
-        
+        sel_station = st.selectbox("Select station for analysis:", stations)
+        s_df = df[df['Station'] == sel_station].groupby('Week_Num').agg({'Actual': 'sum', 'Planned': 'mean'}).reset_index()
+        x, y = s_df['Week_Num'].values, s_df['Actual'].values
+        slope, intercept, r, p, std_err = stats.linregress(x, y)
+        weeks_ext = np.array(range(1, 10))
+        y_pred = slope * weeks_ext + intercept
+        w9_forecast = y_pred[-1]
+        ci = (1.96 * std_err) if std_err > 10.0 else 25.0
+        upper_bound = y_pred + ci
+        lower_bound = y_pred - ci
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=x, y=y, mode='markers+lines', name='Actual History'))
-        fig.add_trace(go.Scatter(x=[1, 9], y=[m*1+b, w9], mode='lines', name='Trajectory', line=dict(dash='dash')))
+        fig.add_trace(go.Scatter(x=np.concatenate([weeks_ext, weeks_ext[::-1]]), y=np.concatenate([upper_bound, lower_bound[::-1]]), fill='toself', fillcolor='rgba(88, 166, 255, 0.1)', line=dict(color='rgba(255,255,255,0)'), hoverinfo="skip", name='95% Confidence Interval'))
+        fig.add_trace(go.Scatter(x=x, y=y, mode='markers+lines', name='Historical Actual', marker=dict(color='#3FB950', size=8)))
+        fig.add_trace(go.Scatter(x=weeks_ext, y=y_pred, mode='lines', name='Trajectory', line=dict(dash='dash', color='#58A6FF', width=2)))
         st.plotly_chart(apply_chart_theme(fig), use_container_width=True)
-        st.info(f"Predicted Week 9 load for {sel_station}: {w9:.1f} hours.")
+        avg_planned = s_df['Planned'].mean()
+        st.info(f"Executive Summary for {sel_station}: Workload is {'increasing' if slope > 0 else 'decreasing'} at {abs(slope):.1f} hours/week. Week 9 prediction: {w9_forecast:.1f} hours.")
+        st.markdown("---")
+        st.subheader("Week 9 Executive Risk Report")
+        risk_data = []
+        for s in stations:
+            temp_df = df[df['Station'] == s].groupby('Week_Num')['Actual'].sum().reset_index()
+            tx, ty = temp_df['Week_Num'].values, temp_df['Actual'].values
+            m, b, _, _, _ = stats.linregress(tx, ty)
+            w9 = m * 9 + b
+            avg_hist = ty.mean()
+            status = "HIGH RISK" if m > 0 and w9 > (avg_hist * 1.15) else "MONITOR" if m > 0 else "STABLE"
+            risk_data.append({"Station": s, "W9 Forecast": f"{w9:.1f}h", "Trend": "Rising" if m > 0 else "Falling", "Status": status})
+        risk_df = pd.DataFrame(risk_data)
+        def color_risk_internal(val):
+            if "HIGH" in val: return 'color: #ff6b6b; font-weight: bold'
+            if "STABLE" in val: return 'color: #3FB950;'
+            return 'color: #D29922;'
+        st.table(risk_df.style.map(color_risk_internal, subset=['Status']))
