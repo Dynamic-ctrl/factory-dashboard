@@ -73,7 +73,7 @@ def run_query(query, parameters=None):
 # ---------------------------------------------------------
 # NAVIGATION
 # ---------------------------------------------------------
-st.sidebar.title("Level 6 Aditi Mehta")
+st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", [
     "Self-Test", 
     "1. Project Overview", 
@@ -282,7 +282,12 @@ elif page == "5. Predictive Forecast":
         fig.add_trace(go.Scatter(x=weeks_ext, y=y_pred, mode='lines', name='Trajectory', line=dict(dash='dash', color='#58A6FF', width=2)))
         st.plotly_chart(apply_chart_theme(fig), use_container_width=True)
         avg_planned = s_df['Planned'].mean()
-        st.info(f"Executive Summary for {sel_station}: Workload is {'increasing' if slope > 0 else 'decreasing'} at {abs(slope):.1f} hours/week. Week 9 prediction: {w9_forecast:.1f} hours.")
+        st.info(f"""
+        **Executive Summary for {sel_station}:** Currently, the workload is **{trend_desc}** at a rate of **{abs(slope):.1f} hours per week**.
+        
+        **Week 9 Prediction:** We expect a load of **{w9_forecast:.1f} hours**. 
+        This is **{abs(((w9_forecast/avg_planned)-1)*100):.1f}%** {'above' if w9_forecast > avg_planned else 'below'} the standard planned baseline.
+        """)
         st.markdown("---")
         st.subheader("Week 9 Executive Risk Report")
         risk_data = []
