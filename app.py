@@ -185,12 +185,16 @@ elif page == "3. Capacity Tracker":
     
     if not df.empty:
         df['Total_Capacity'] = df['Own_Hours'] + df['Hired'] + df['Overtime']
+        
+        # Deficit is negative in CSV if there is a shortfall. 
+        # So Capacity - Deficit = Total Demand (e.g., 480 - (-132) = 612)
         df['Total_Demand'] = df['Total_Capacity'] - df['Deficit']
 
         cols = ['Week', 'Own_Hours', 'Hired', 'Overtime', 'Total_Capacity', 'Total_Demand', 'Deficit']
         df = df[cols]
 
         def highlight_deficit(val):
+            # Highlight red if the factory was short on hours (negative deficit)
             return 'background-color: #ffcccc; color: red; font-weight: bold;' if val < 0 else ''
         
         st.info("💡 **Red highlights indicate weeks where Total Demand exceeded Total Capacity.**")
@@ -208,35 +212,46 @@ elif page == "4. Worker Coverage":
     df = run_query(query)
     
     if not df.empty:
+        # 1. SPOF Logic (Filter to True coverage, then count)
         covered_df = df[df['Can_Cover'] == True]
         station_counts = covered_df['Station'].value_counts()
         spof_stations = station_counts[station_counts == 1].index.tolist()
         
         if spof_stations:
             st.error(f"🚨 **SINGLE POINT OF FAILURE DETECTED:** Only 1 worker is available to cover: **{', '.join(spof_stations)}**")
+            
             for station in spof_stations:
+                # Find exactly WHO the single worker is for this station
                 spof_worker = covered_df[covered_df['Station'] == station]['Worker'].values[0]
-                st.warning(f"⚠️ **Business Impact Risk:** **{spof_worker}** is the *only* person certified to operate the **{station}**. Immediate cross-training is required.")
+                
+                st.warning(f"⚠️ **Business Impact Risk:** **{spof_worker}** is the *only* person certified to operate the **{station}**. If {spof_worker} calls in sick, takes vacation, or leaves the company, this machine completely shuts down and halts production. Immediate cross-training is required.")
         else:
             st.success("✅ Factory is secure. No single points of failure detected.")
 
         st.markdown("### Cross-Training Matrix")
+        
+        # 2. Build the visual Matrix using Pandas crosstab
         matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max')
+        
+        # 3. Convert True/False into visual icons
         matrix = matrix.fillna(False)
         visual_matrix = matrix.replace({True: "✅", False: "❌", 1.0: "✅", 0.0: "❌", 1: "✅", 0: "❌"})
         
+        # 4. Highlight the SPOF column directly in the matrix
         if spof_stations:
             rename_map = {station: f"🚨 {station}" for station in spof_stations}
             visual_matrix = visual_matrix.rename(columns=rename_map)
+            
             highlight_cols = list(rename_map.values())
             def highlight_spof_column(s):
                 return ['background-color: #4a1515;' if s.name in highlight_cols else '' for _ in s]
+            
             st.dataframe(visual_matrix.style.apply(highlight_spof_column, axis=0), use_container_width=True)
         else:
             st.dataframe(visual_matrix, use_container_width=True)
 
 elif page == "5. Predictive Forecast":
-    st.title("Week 9 Manufacturing Risk Forecast")
+    st.title("🔮 Week 9 Manufacturing Risk Forecast")
     st.markdown("""
     This page uses **Linear Regression** to analyze the last 8 weeks of production and predict 
     workload for the upcoming week. It identifies where the factory is trending toward a bottleneck.
@@ -254,7 +269,7 @@ elif page == "5. Predictive Forecast":
         df['Week_Num'] = df['Week'].str.extract('(\d+)').astype(int)
         stations = sorted(df['Station'].unique())
         
-        st.subheader("Station Trajectory")
+        st.subheader("🔍 Deep Dive: Station Trajectory")
         sel_station = st.selectbox("Select a station to analyze:", stations)
         
         s_df = df[df['Station'] == sel_station].groupby('Week_Num').agg({
@@ -272,7 +287,7 @@ elif page == "5. Predictive Forecast":
         
         # --- FIX: VISIBLE CONFIDENCE BAND ---
         # 1.96 * std_err covers 95% of probability. We add a floor of 2.0 for visibility.
-        ci = (1.96 * std_err) if std_err > 10.0 else 25.0
+        ci = (1.96 * std_err) if std_err > 0.05 else 2.5
         upper_bound = y_pred + ci
         lower_bound = y_pred - ci
 
@@ -309,8 +324,7 @@ elif page == "5. Predictive Forecast":
             title=f"Workload Trend for {sel_station}", 
             xaxis_title="Week Number", 
             yaxis_title="Hours",
-            hovermode="x unified",
-            xaxis=dict(tickmode='linear', tick0=1, dtick=1)
+            hovermode="x unified"
         )
         st.plotly_chart(fig, use_container_width=True)
 
@@ -360,4 +374,5 @@ elif page == "5. Predictive Forecast":
             if "STABLE" in val: return 'color: #00ff00;'
             return 'color: #ffa500;'
 
+        # Using .map() here specifically to prevent the Streamlit Cloud applymap error
         st.table(risk_df.style.map(color_risk, subset=['Status']))
