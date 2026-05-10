@@ -248,10 +248,19 @@ elif page == "4. Worker Coverage":
         else:
             st.success("Factory is secure. No single points of failure detected.")
         st.markdown("### Cross-Training Matrix")
-        matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max')
-        matrix = matrix.fillna(False)
+        # 1. Create the matrix
+        matrix = pd.crosstab(index=df['Worker'], columns=df['Station'], values=df['Can_Cover'], aggfunc='max').fillna(False)
         visual_matrix = matrix.replace({True: "OK", False: "--"})
-        st.dataframe(visual_matrix, use_container_width=True)
+
+        # 2. Define the highlighting function
+        def highlight_spof_cols(col):
+            # Check if this station name is in your list of SPOF stations
+            if col.name in spof_stations:
+                return ['background-color: rgba(255, 75, 75, 0.2); border: 1px solid #ff4b4b;'] * len(col)
+            return [''] * len(col)
+
+        # 3. Display the styled matrix
+        st.dataframe(visual_matrix.style.apply(highlight_spof_cols), use_container_width=True)
 
 elif page == "5. Predictive Forecast":
     st.title("Week 9 Manufacturing Risk Forecast")
@@ -285,6 +294,7 @@ elif page == "5. Predictive Forecast":
         st.info(f"Executive Summary for {sel_station}: Workload is {'increasing' if slope > 0 else 'decreasing'} at {abs(slope):.1f} hours/week. Week 9 prediction: {w9_forecast:.1f} hours.")
         st.markdown("---")
         st.subheader("Week 9 Executive Risk Report")
+        st.write("Summary of all stations projected for Week 9 based on growth trends:")
         risk_data = []
         for s in stations:
             temp_df = df[df['Station'] == s].groupby('Week_Num')['Actual'].sum().reset_index()
