@@ -9,11 +9,11 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------
-# SETUP & UI CLEANUP
+# SETUP & UI ADJUSTMENTS
 # ---------------------------------------------------------
 st.set_page_config(page_title="Factory Intelligence Dashboard", layout="wide")
 
-# Custom CSS: Only internal elements and sidebar footer (Background is now DEFAULT)
+# Custom CSS for Sidebar Footer and Specific Components Only
 st.markdown("""
     <style>
     /* Fixed Footer in Sidebar */
@@ -29,7 +29,7 @@ st.markdown("""
         z-index: 1000;
     }
     
-    /* Particular Page Styling: Metrics */
+    /* Specific Component Styling */
     [data-testid="stMetricValue"] {
         font-size: 2.2rem !important;
         font-weight: 600 !important;
@@ -42,7 +42,6 @@ st.markdown("""
         letter-spacing: 1px;
     }
 
-    /* Particular Page Styling: Tables & Alerts */
     .stDataFrame, .stTable {
         border-radius: 4px;
     }
@@ -98,7 +97,7 @@ page = st.sidebar.radio("Go to", [
 # Sidebar Footer
 st.sidebar.markdown('<div class="sidebar-footer">Aditi Mehta</div>', unsafe_allow_html=True)
 
-# Chart Theming (Blends with default backgrounds)
+# Chart Theming
 def apply_chart_theme(fig):
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
