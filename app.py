@@ -117,7 +117,7 @@ if page == "✅ Self-Test":
     st.subheader(f"**SELF-TEST SCORE: {total_score}/{max_score}**")
 
 elif page == "1. Project Overview":
-    st.title("📊 Project Overview")
+    st.title("Project Overview")
     st.info("""
     **💡 Manager's Guide:** This page tracks the overall health of your active projects. Pay close attention to **Variance %**. 
     * 🔴 **Positive Variance (e.g., +15%):** The project took *longer* than estimated, costing the company extra money. 
@@ -147,7 +147,7 @@ elif page == "1. Project Overview":
         st.dataframe(df, use_container_width=True)
 
 elif page == "2. Station Load":
-    st.title("🏭 Station Load (Weekly Timeline)")
+    st.title("Station Load (Weekly Timeline)")
     st.info("""
     **💡 Manager's Guide:** This timeline helps spot physical bottlenecks on the factory floor. Compare the **Planned** (estimated) vs **Actual** (realized) hours. If a station consistently logs higher actual hours, it indicates machine wear, underestimation by the planning team, or a need for operator training.
     """)
@@ -178,7 +178,7 @@ elif page == "2. Station Load":
             st.dataframe(over_budget, use_container_width=True)
 
 elif page == "3. Capacity Tracker":
-    st.title("⏱️ Factory Capacity vs Demand")
+    st.title("Factory Capacity vs Demand")
     st.info("""
     **💡 Manager's Guide:** This is your workforce scheduling tool. It calculates if you have enough human-hours to complete the planned work. 
     **Watch the Deficit column:** Any number highlighted in **Red** means the factory is understaffed for that week. You must authorize overtime or hire contractors to prevent project delays.
