@@ -9,14 +9,17 @@ from neo4j import GraphDatabase
 from dotenv import load_dotenv
 
 # ---------------------------------------------------------
-# SETUP & UI ADJUSTMENTS
+# SETUP & UI CLEANUP
 # ---------------------------------------------------------
 st.set_page_config(page_title="Factory Intelligence Dashboard", layout="wide")
 
-# Custom CSS for sidebar footer only - No background overrides
+# Custom CSS for Sidebar Footer and Clean Metrics (No hardcoded background colors)
 st.markdown("""
     <style>
     /* Fixed Footer in Sidebar */
+    [data-testid="stSidebarNav"] {
+        padding-bottom: 50px;
+    }
     .sidebar-footer {
         position: fixed;
         bottom: 20px;
@@ -24,6 +27,14 @@ st.markdown("""
         font-size: 0.85rem;
         color: #888;
         z-index: 1000;
+    }
+    
+    /* Ensuring Metrics and Alerts look clean in both modes */
+    [data-testid="stMetricValue"] {
+        font-weight: 600 !important;
+    }
+    .stAlert {
+        border-radius: 4px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -43,7 +54,7 @@ if not NEO4J_URI:
         pass
 
 if not NEO4J_PASSWORD or not NEO4J_URI:
-    st.error("🚨 CRITICAL ERROR: Could not read credentials. Check your .env file or Streamlit Secrets.")
+    st.error("CRITICAL ERROR: Could not read credentials. Check your .env file or Streamlit Secrets.")
     st.stop()
 
 @st.cache_resource
@@ -70,10 +81,10 @@ page = st.sidebar.radio("Go to", [
     "5. Predictive Forecast"
 ])
 
-# Footer in sidebar
+# Sidebar Footer
 st.sidebar.markdown('<div class="sidebar-footer">Aditi Mehta</div>', unsafe_allow_html=True)
 
-# Chart Theming (Clean and standard)
+# Chart Theming (Automatic based on theme)
 def apply_chart_theme(fig):
     fig.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
@@ -85,7 +96,7 @@ def apply_chart_theme(fig):
     return fig
 
 # ---------------------------------------------------------
-# PAGE LOGIC (Exactly as provided)
+# PAGE LOGIC
 # ---------------------------------------------------------
 
 if page == "Self-Test":
